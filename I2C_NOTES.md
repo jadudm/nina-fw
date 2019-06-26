@@ -1,6 +1,8 @@
 # I2C NOTES
 * There are notes made along the way towards implementing an I2C interface for the nina-fw.*
 
+# 20190626 (Wednesday)
+
 ## Defaults
 
         SPISClass::SPISClass(spi_host_device_t hostDevice, int dmaChannel, int mosiPin, int misoPin, int sclkPin, int csPin, int readyPin) :
@@ -115,8 +117,39 @@ RESPONSE: e0b4010100ee
 
 This looks good to me. Or, it looks like a starting point. I'm going to pause here. This is a good day's work... or, I have other work I have to do...
 
+# 20190626 (Still Wednesday)
 
+I ran  things again.
 
+                Berea24         RSSI: -66
+                Berea24_Ext             RSSI: -86
+                TC8717TB9               RSSI: -88
+                HawkCM          RSSI: -91
+        Connecting to AP...
+        Connected to Berea24    RSSI: -64
+        My IP address is 192.168.1.160
+        IP lookup adafruit.com: 104.20.38.240
+        Ping google.com: 270 ms
+        Fetching text from http://wifitest.adafruit.com/testwifi/index.html
+        ----------------------------------------
+        This is a test of Adafruit WiFi!
+        If you can read this, its working :)
 
+        ----------------------------------------
+
+        Fetching json from http://api.coindesk.com/v1/bpi/currentprice/USD.json
+        ----------------------------------------
+        {'time': {'updated': 'Jun 26, 2019 22:37:00 UTC', 'updatedISO': '2019-06-26T22:37:00+00:00', 'updateduk': 'Jun 26, 2019 at 23:37 BST'}, 'disclaimer': 'This data was produced from the CoinDesk Bitcoin Price Index (USD). Non-USD currency data converted using hourly conversion rate from openexchangerates.org', 'bpi': {'USD': {'code': 'USD', 'description': 'United States Dollar', 'rate_float': 12217.2, 'rate': '12,217.1550'}}}
+        ----------------------------------------
+        Done!
+
+        Code done running. Waiting for reload.
+        Auto-reload is on. Simply save files over USB to run them or enter REPL to disable.
+
+Everything worked. Don't know why. So, that means that the firmware is "good" according to Adafruit. I have a working firmware, compiled against ESP-IDF4.X.
+
+Looking at the CircuitPython client (https://github.com/adafruit/Adafruit_CircuitPython_ESP32SPI/blob/master/adafruit_esp32spi/adafruit_esp32spi.py), it looks like I may be able (in that client, anyway) be able to get away with a small change. There are SPI routines to read and write single bytes; if there are corresponding I2C calls, then... it might be a fast port of that library.
+
+I think my next step will be on the queen side of the I2C connection... can I put in an I2C handler that stuffs buffers full of data in the same way the SPI connection does. If I can, I'm pretty much all of the way there.
 
 
