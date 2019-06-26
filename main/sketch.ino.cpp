@@ -23,6 +23,10 @@ extern "C" {
   #include <driver/periph_ctrl.h>
   #include <driver/uart.h>
   #include <esp_bt.h>
+  // MCJ 20190626 
+  // For esp-idf 4.X, this driver is needed for the 
+  // GPIO_PIN_MUX_REG macro.
+  #include <driver/gpio.h>
 }
 
 #include <Arduino.h>
