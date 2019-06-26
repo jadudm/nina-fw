@@ -113,4 +113,17 @@ void SPISClass::handleSetupComplete()
   xSemaphoreGiveFromISR(_readySemaphore, NULL);
 }
 
-SPISClass SPIS(VSPI_HOST, 1, 14, 23, 18, 5, 33);
+// On an AirLift
+// SPISClass SPIS(VSPI_HOST, 1, 14, 23, 18, 5, 33);
+
+// On a Huzzah32
+/*
+FUNCTION   AIRLIFT     HUZZAH
+           PIN         PIN
+MOSI       IO14        IO18
+MISO       IO23        IO19
+SCLK       IO18        IO5
+CS         IO5         IO21$
+READY      IO33        IO4$
+ */
+SPISClass SPIS(VSPI_HOST, 1, 18, 19, 5, 21, 4);
