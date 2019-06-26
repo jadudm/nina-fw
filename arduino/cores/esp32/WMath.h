@@ -24,7 +24,13 @@
 extern "C" {
 #endif
 
-extern long random(long);
+// FIXME: There is a conflict with long int random(void) in stdlib.
+// This needs to be handled differently.
+// This is a hack to make it compile under ESP-IDF 4
+// extern long random(long);
+#define random esp32_random
+extern long esp32_random(long);
+
 
 #ifdef __cplusplus
 }
