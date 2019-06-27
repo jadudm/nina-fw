@@ -32,9 +32,12 @@ extern "C" {
 #include <Arduino.h>
 
 #include <SPIS.h>
+#include <I2CS.h>
 #include <WiFi.h>
 
 #include "CommandHandler.h"
+
+#define USE_I2C 1
 
 #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 
@@ -144,7 +147,12 @@ void setupBluetooth() {
 void setupWiFi() {
   esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
   if (debug)  ets_printf("*** SPIS\n");
+
+  #ifdef USE_I2C
+  I2CS.begin();
+  #else
   SPIS.begin();
+  #endif
 
   if (WiFi.status() == WL_NO_SHIELD) {
     if (debug)  ets_printf("*** NOSHIELD\n");
@@ -158,11 +166,28 @@ void setupWiFi() {
   CommandHandler.begin();
 }
 
+// MCJ 20190627
+// I don't know if I want a compiler directive, but this is 
+// one way to keep the main loop clean.
+int transfer (uint8_t out[], uint8_t in[], size_t len) {
+  
+  int commandLength = 0;
+  #ifdef USE_I2C
+  commandLength = I2CS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
+  #else
+  commandLength = SPIS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
+  #endif
+
+  return commandLength;
+}
+
 void loop() {
   if (debug)  ets_printf(".");
   // wait for a command
   memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
-  int commandLength = SPIS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
+  
+  int commandLength = transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
+
   if (debug)  ets_printf("%d", commandLength);
   if (commandLength == 0) {
     return;
@@ -176,7 +201,7 @@ void loop() {
   memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
   int responseLength = CommandHandler.handle(commandBuffer, responseBuffer);
 
-  SPIS.transfer(responseBuffer, NULL, responseLength);
+  transfer(responseBuffer, NULL, responseLength);
 
   if (debug) {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);

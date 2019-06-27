@@ -27,33 +27,33 @@ class I2CSClass {
 
   public:
     // i2cNum  -> Either I2C_NUM_0 or I2C_NUM_1
-    // sclPin  -> 
-    // sdaPin  ->
+    // sclPin  -> 19
+    // sdaPin  -> 18
     // i2cAddr -> In the range 0x01 to 0x7F
     // Regarding GPIO pin numbers: http://bit.ly/31W5e57
-    I2CSClass(int i2cNum, int sclPin, int sdaPin, int i2cAddr);
+    I2CSClass(int i2cPortNum, int sclPin, int sdaPin, int i2cAddr);
 
     int begin();
     int transfer(uint8_t out[], uint8_t in[], size_t len);
 
-  private:
-    // static void onSetupComplete(spi_slave_transaction_t*);
-    void handleSetupComplete();
+  // MCJ 20190627
+  // No private methods (yet)
+  // private:
 
   private:
-    int _i2cNum;
-    int _sclPin;
-    int _sdaPin;
+    i2c_port_t _i2cPortNum;
+    gpio_num_t _sclPin;
+    gpio_num_t _sdaPin;
     int _i2cAddr;
+    int _debug = 0;
+    
     // WARNING MCJ 20190627
     // Choosing buffer lengths arbitrarily. May wany to 
     // revisit these numbers. And, think about how they're declared/specified.
+    // At the moment, I'm assuming a data length of 1 byte, which means
+    // this is a 128KB buffer.
     int _i2c_rx_buff_len = 1024;
     int _i2c_tx_buff_len = 1024;
-
-    intr_handle_t _csIntrHandle;
-
-    SemaphoreHandle_t _readySemaphore;
 };
 
 extern I2CSClass I2CS;
