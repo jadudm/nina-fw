@@ -146,11 +146,12 @@ void setupBluetooth() {
 
 void setupWiFi() {
   esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
-  if (debug)  ets_printf("*** SPIS\n");
 
   #ifdef USE_I2C
+  if (debug)  ets_printf("*** I2CS\n");
   I2CS.begin();
   #else
+  if (debug)  ets_printf("*** SPIS\n");
   SPIS.begin();
   #endif
 

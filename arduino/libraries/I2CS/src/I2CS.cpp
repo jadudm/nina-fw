@@ -53,15 +53,32 @@ int I2CSClass::begin()
   // FIXME MCJ 20190627
   // Check what these macros do, and decide if I'd rather 
   // do something else for error handling.
-  ESP_ERROR_CHECK(i2c_param_config(_i2cPortNum, &conf));
-  ESP_ERROR_CHECK(i2c_driver_install(
+  if (_debug) ets_printf("I2C In the begin()ning.\n");
+
+  int check = i2c_param_config(_i2cPortNum, &conf);
+  if (_debug) ets_printf("i2c_param_config == %d\n", check);
+
+  if (check == ESP_OK && _debug) {
+    ets_printf("I2C param config checks out.\n");
+  } else if (check == ESP_ERR_INVALID_ARG && _debug) {
+    ets_printf("I2C param config FAIL.\n");
+  }
+
+  check = i2c_driver_install(
       _i2cPortNum,
       conf.mode,
       _i2c_rx_buff_len,
       _i2c_tx_buff_len,
       0
-  ));
+  );
 
+  if (check == ESP_OK && _debug) {
+    ets_printf("I2C driver installed OK!\n");
+  } else if (check == ESP_ERR_INVALID_ARG && _debug) {
+    ets_printf("I2C driver install param error.\n");
+  } else if (check == ESP_FAIL && _debug) {
+    ets_printf("I2C driver install fail.\n");
+  }
   // WARNING MCJ 20190627
   // The SPIS class returns 1. In the UNIX world, this is an error.
   // I'm assuming that 1 is being returned to be a notional TRUE
