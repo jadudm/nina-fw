@@ -39,7 +39,8 @@ extern "C" {
 
 #define USE_I2C 1
 
-#define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
+// #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
+#define SPI_BUFFER_LEN 32
 
 int debug = 1;
 
@@ -189,13 +190,14 @@ void loop() {
   
   int commandLength = transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
 
-  if (debug)  ets_printf("%d", commandLength);
+  if (debug)  ets_printf("commandLength: %d\n", commandLength);
   if (commandLength == 0) {
     return;
   }
 
   if (debug) {
     dumpBuffer("COMMAND", commandBuffer, commandLength);
+    ets_printf("\n");
   }
 
   // process
@@ -206,5 +208,6 @@ void loop() {
 
   if (debug) {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);
+    ets_printf("\n");
   }
 }

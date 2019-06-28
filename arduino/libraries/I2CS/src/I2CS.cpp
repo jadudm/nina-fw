@@ -91,24 +91,31 @@ int I2CSClass::begin()
 int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 {
   int result = -1;
+  const int PEEK = 32;
 
   // If 'in' is NULL, then we're doing an output.
-  if (in == NULL){
+  if (in == NULL) {
+    if (_debug) ets_printf("OUTPUT I2C BUFFER len[%d]\n", len);  
     // Send the bytes.
     // ESP-IDF: http://bit.ly/2xiJvpK
-    result = i2c_slave_write_buffer(_i2cPortNum, out, len, portMAX_DELAY);
+    // FIXME MCJ 20190627
+    // How long until we time out? 
+    // How about one tick, which is... 10ms?
+    // https://esp32.com/viewtopic.php?f=2&t=2377
+    result = i2c_slave_write_buffer(_i2cPortNum, out, len, 500);
   } else if (out == NULL) {
+    if (_debug) ets_printf("INPUT I2C BUFFER len[%d]\n", len);
     // Or, we're doing an input.
+    i2c_reset_rx_fifo(_i2cPortNum);
+    vTaskDelay(2);
     result = i2c_slave_read_buffer(_i2cPortNum, in, len, portMAX_DELAY);
     
     if (_debug) {
-      xSemaphoreTake(print_mux, portMAX_DELAY);
-      printf("I2C IN RESULT: %d\n\t", result);
+      ets_printf("I2C IN RESULT: %d\n\t", result);
       for (int ndx = 0; ndx < len ; ndx++) {
-        printf("%02x", in[ndx]);
+        ets_printf("%02x ", in[ndx]);
       }
-      printf("\n");
-      xSemaphoreGive(print_mux);
+      ets_printf("\n\n");
     }
   }
 
@@ -122,5 +129,7 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 // at class init time based on a GPIO read of high/low. 
 
 // I2CSClass(int i2cNum, int sclPin, int sdaPin, int i2cAddr);
-I2CSClass I2CS(I2C_NUM_0, GPIO_NUM_19, GPIO_NUM_18, 0x2A);
+// SCL on the Huzzah32 is GPIO22
+// SDA on the Huzzah32 is GPIO23
+I2CSClass I2CS(I2C_NUM_0, GPIO_NUM_22, GPIO_NUM_23, 0x2A);
 
