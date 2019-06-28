@@ -45,7 +45,7 @@ class I2CSClass {
     gpio_num_t _sclPin;
     gpio_num_t _sdaPin;
     int _i2cAddr;
-    int _debug = 1;
+    int _debug = 0;
 
     // WARNING MCJ 20190627
     // Choosing buffer lengths arbitrarily. May wany to 

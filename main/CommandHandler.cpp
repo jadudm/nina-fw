@@ -940,7 +940,7 @@ int setPinMode(const uint8_t command[], uint8_t response[])
   uint8_t pin = command[4];
   uint8_t mode = command[6];
  
-  ets_printf("pinMode(%02x, %02x)\n", pin, mode);
+  /// ets_printf("pinMode(%02x, %02x)\n", pin, mode);
  
   pinMode(pin, mode);
 
@@ -956,7 +956,7 @@ int setDigitalWrite(const uint8_t command[], uint8_t response[])
   uint8_t pin = command[4];
   uint8_t value = command[6];
   
-  ets_printf("digitalWrite(%02x, %02x)\n", pin, value);
+  //ets_printf("digitalWrite(%02x, %02x)\n", pin, value);
 
   digitalWrite(pin, value);
 
@@ -1098,7 +1098,7 @@ int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
   int responseLength = 0;
 
   if (command[0] == 0xe0 && command[1] < NUM_COMMAND_HANDLERS) {
-    ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
+    //ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
 
     CommandHandlerType commandHandlerType = commandHandlers[command[1]];
 

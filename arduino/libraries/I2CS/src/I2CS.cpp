@@ -22,6 +22,7 @@
 #include "WInterrupts.h"
 // Includes drivers for I2C operation on the ESP32.
 #include "I2CS.h"
+#include "driver/i2c.h"
 
 SemaphoreHandle_t print_mux = NULL;
 
@@ -91,7 +92,10 @@ int I2CSClass::begin()
 int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 {
   int result = -1;
-  const int PEEK = 32;
+  uint8_t byte = 0;
+
+  i2c_reset_rx_fifo(_i2cPortNum);
+  i2c_reset_tx_fifo(_i2cPortNum);
 
   // If 'in' is NULL, then we're doing an output.
   if (in == NULL) {
@@ -99,16 +103,20 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
     // Send the bytes.
     // ESP-IDF: http://bit.ly/2xiJvpK
     // FIXME MCJ 20190627
-    // How long until we time out? 
+    // How long until we time out?
     // How about one tick, which is... 10ms?
     // https://esp32.com/viewtopic.php?f=2&t=2377
-    result = i2c_slave_write_buffer(_i2cPortNum, out, len, 500);
+    result = i2c_slave_write_buffer(_i2cPortNum, out, len, 50);
   } else if (out == NULL) {
-    if (_debug) ets_printf("INPUT I2C BUFFER len[%d]\n", len);
-    // Or, we're doing an input.
-    i2c_reset_rx_fifo(_i2cPortNum);
-    vTaskDelay(2);
-    result = i2c_slave_read_buffer(_i2cPortNum, in, len, portMAX_DELAY);
+    // if (_debug) ets_printf("INPUT I2C BUFFER len[%d]\n", len);
+    // Read the length
+    // 1 is 10ms
+    // 10 is 100ms
+    // 100 is 1000ms
+    result = i2c_slave_read_buffer(_i2cPortNum, &byte, 1, portMAX_DELAY);
+    // ets_printf("\n%d\n", byte);
+    // Read the bytes
+    result = i2c_slave_read_buffer(_i2cPortNum, in, byte, portMAX_DELAY);
     
     if (_debug) {
       ets_printf("I2C IN RESULT: %d\n\t", result);

@@ -42,7 +42,7 @@ extern "C" {
 // #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 #define SPI_BUFFER_LEN 32
 
-int debug = 1;
+int debug = 0;
 
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
@@ -175,7 +175,7 @@ int transfer (uint8_t out[], uint8_t in[], size_t len) {
   
   int commandLength = 0;
   #ifdef USE_I2C
-  commandLength = I2CS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
+  commandLength = I2CS.transfer(out, in, len);
   #else
   commandLength = SPIS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
   #endif
