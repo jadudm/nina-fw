@@ -42,7 +42,7 @@ extern "C" {
 // #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 #define SPI_BUFFER_LEN 32
 
-int debug = 0;
+int debug = 1;
 
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
@@ -89,8 +89,17 @@ void setDebug(int d) {
   }
 }
 
-void setupWiFi();
-void setupBluetooth();
+// MCJ 20190628 REMOVED CODE
+// The code for the Arduino had setup routines for 
+// bluetooth... but, that code didn't get used.
+// Furhter, the command handlers were initialized 
+// in the WiFi setup routine... which didn't set up the
+// WiFi. I've moved this code to setup(), where it
+// belongs.
+
+
+bool has_message = false;
+void i2c_handler(void* parameter);
 
 void setup() {
   setDebug(debug);
@@ -98,74 +107,37 @@ void setup() {
   // put SWD and SWCLK pins connected to SAMD as inputs
   pinMode(15, INPUT);
   pinMode(21, INPUT);
-
-  pinMode(5, INPUT);
-  if (digitalRead(5) == LOW) {
-    if (debug)  ets_printf("*** BLUETOOTH ON\n");
-
-    setupBluetooth();
-  } else {
-    if (debug)  ets_printf("*** WIFI ON\n");
-
-    setupWiFi();
-  }
-}
-
-#define UNO_WIFI_REV2
-
-void setupBluetooth() {
-  periph_module_enable(PERIPH_UART1_MODULE);
-  periph_module_enable(PERIPH_UHCI0_MODULE);
-
-#ifdef UNO_WIFI_REV2
-  uart_set_pin(UART_NUM_1, 1, 3, 33, 0); // TX, RX, RTS, CTS
-#else
-  uart_set_pin(UART_NUM_1, 23, 12, 18, 5);
-#endif
-  uart_set_hw_flow_ctrl(UART_NUM_1, UART_HW_FLOWCTRL_CTS_RTS, 5);
-
-  esp_bt_controller_config_t btControllerConfig = BT_CONTROLLER_INIT_CONFIG_DEFAULT(); 
-
-  btControllerConfig.hci_uart_no = UART_NUM_1;
-#ifdef UNO_WIFI_REV2
-  btControllerConfig.hci_uart_baudrate = 115200;
-#else
-  btControllerConfig.hci_uart_baudrate = 912600;
-#endif
-
-  esp_bt_controller_init(&btControllerConfig);
-  while (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE);
-  esp_bt_controller_enable(ESP_BT_MODE_BLE);
-  esp_bt_sleep_enable();
-
-  vTaskSuspend(NULL);
-
-  while (1) {
-    vTaskDelay(portMAX_DELAY);
-  }
-}
-
-void setupWiFi() {
-  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
-
-  #ifdef USE_I2C
-  if (debug)  ets_printf("*** I2CS\n");
-  I2CS.begin();
-  #else
-  if (debug)  ets_printf("*** SPIS\n");
-  SPIS.begin();
-  #endif
-
-  if (WiFi.status() == WL_NO_SHIELD) {
-    if (debug)  ets_printf("*** NOSHIELD\n");
-    while (1); // no shield
-  }
   
+  if (debug) ets_printf("Initializing buffers\n");
   commandBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
   responseBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
+  memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
+  memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
 
-  if (debug)  ets_printf("*** BEGIN\n");
+  #ifdef USE_I2C
+    if (debug)  ets_printf("*** I2CS\n");
+    I2CS.begin();
+  #else
+    if (debug)  ets_printf("*** SPIS\n");
+    SPIS.begin();
+  #endif
+  
+  if (debug) ets_printf("Starting CommandHandler\n");
   CommandHandler.begin();
+
+  if (debug) ets_printf("i2c_handler task creation...\n");
+  xTaskCreate(i2c_handler, 
+              // task handler
+              "i2c_handler",
+              // stack size
+              1000,
+              // task parameter
+              NULL,
+              // priority
+              1,
+              // handle for tracking the created task
+              NULL
+              );
 }
 
 // MCJ 20190627
@@ -183,31 +155,28 @@ int transfer (uint8_t out[], uint8_t in[], size_t len) {
   return commandLength;
 }
 
+// http://www.esp32learning.com/code/esp32-and-freertos-example-create-a-task.php
+// https://www.hackster.io/Niket/tasks-parametertotasks-freertos-tutorial-5-b8a7b7
+void i2c_handler (void* parameter) {
+
+  while (true) {
+    // Returns -1 if error; otherwise, byte value.
+    int b = I2CS.read_byte();
+    if (b > -1) {
+      ets_printf("%02x ", b);
+      has_message = true;
+    }
+    vTaskDelay(1);
+  } 
+
+  vTaskDelete(NULL);
+}
+
 void loop() {
-  if (debug)  ets_printf(".");
-  // wait for a command
-  memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
-  
-  int commandLength = transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
-
-  if (debug)  ets_printf("commandLength: %d\n", commandLength);
-  if (commandLength == 0) {
-    return;
+  if (has_message) {
+    ets_printf("has_message\n");
+    has_message = false;
+    //interpret_message();
   }
-
-  if (debug) {
-    dumpBuffer("COMMAND", commandBuffer, commandLength);
-    ets_printf("\n");
-  }
-
-  // process
-  memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
-  int responseLength = CommandHandler.handle(commandBuffer, responseBuffer);
-
-  transfer(responseBuffer, NULL, responseLength);
-
-  if (debug) {
-    dumpBuffer("RESPONSE", responseBuffer, responseLength);
-    ets_printf("\n");
-  }
+  vTaskDelay(1);
 }

@@ -89,6 +89,22 @@ int I2CSClass::begin()
   return 1;
 }
 
+int I2CSClass::read_byte() {
+  uint8_t byte = 0;
+
+  int result = i2c_slave_read_buffer(_i2cPortNum, &byte, 1, 1);
+
+  if (result == ESP_FAIL) {
+    return ESP_FAIL;
+  } else if (result == 0) {
+    // FIXME: This is the same as ESP_FAIL...
+    return -1;
+  } else {
+    i2c_reset_rx_fifo(_i2cPortNum);
+    return byte;
+  }
+}
+
 int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 {
   int result = -1;
