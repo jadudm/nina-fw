@@ -130,7 +130,7 @@ void setup() {
               // task handler
               "i2c_handler",
               // stack size
-              1000,
+              10000,
               // task parameter
               NULL,
               // priority
@@ -155,17 +155,133 @@ int transfer (uint8_t out[], uint8_t in[], size_t len) {
   return commandLength;
 }
 
+
+#define ERROR_BYTE -1
+#define ST_START 0x01
+#define ST_HEADER 0x02
+#define ST_LENGTH 0x03
+#define ST_VALUE_LENGTHS 0x04
+#define ST_VALUES 0x05
+#define ST_CRC 0x06
+#define HEADER_B1 0xAD
+#define HEADER_B2 0xAF
+int state = ST_START;
+#define NUM_POSSIBLE_PARAMS 255
+
 // http://www.esp32learning.com/code/esp32-and-freertos-example-create-a-task.php
 // https://www.hackster.io/Niket/tasks-parametertotasks-freertos-tutorial-5-b8a7b7
 void i2c_handler (void* parameter) {
+  uint8_t number_of_values = 0;
+  uint8_t value_lengths[NUM_POSSIBLE_PARAMS];
+  uint8_t value_counter = 0;
+  uint8_t total_value_length = 0;
+  uint8_t value_loc = 0;
+  // FIXME: Think about how much space for values array.
+  uint8_t values[255];
 
   while (true) {
     // Returns -1 if error; otherwise, byte value.
+
     int b = I2CS.read_byte();
-    if (b > -1) {
-      ets_printf("%02x ", b);
-      has_message = true;
+
+    switch (state) {
+      // STATE: START
+      // We are looking for the first header byte.
+      case ST_START:
+        switch (b) {
+          case ERROR_BYTE:
+            // pass
+            break;
+          case HEADER_B1:
+
+            ets_printf("HEADER B1\n");
+            // Initialize the variables that carry state.
+            number_of_values = 0;
+            memset(&value_lengths, 0x00, NUM_POSSIBLE_PARAMS);
+            // FIXME: Think about how much space for values array.
+            memset(&values, 0x00, 255);
+            value_counter = 0;
+            total_value_length = 0;
+            value_loc = 0;
+
+            // Set the next state.
+            state = ST_HEADER;
+            break;
+        }
+        break;
+      // STATE: HEADER
+      // Now we are looking for the second header byte.
+      case ST_HEADER:
+        ets_printf("HEADER\n");
+        switch (b) {
+          case HEADER_B2:
+            state = ST_LENGTH;
+            break;
+          default:
+            state = ST_START;
+            break;
+        }
+        break;
+      // In this state, we are going to read a single byte
+      // that says how many values are being sent. A max of
+      // 255 values can be packed together. 
+      case ST_LENGTH:
+        number_of_values = b;
+        ets_printf("LENGTH: %d\n", b);
+        
+        if (number_of_values < NUM_POSSIBLE_PARAMS) {
+          state = ST_VALUE_LENGTHS;
+        } else {
+          state = ST_START;
+        }
+        break;
+      case ST_VALUE_LENGTHS:
+        ets_printf("VAL LENGTHS\n");
+        value_lengths[value_counter] = b;
+        value_counter++;
+        ets_printf("value_counter[%d] >= number_of_values[%d]\n", value_counter, number_of_values);
+        if (value_counter >= number_of_values) {
+          state = ST_VALUES;
+          // Calculate how long all the values are.
+          total_value_length = 0;
+          for (int ndx = 0; ndx < number_of_values ; ndx++) {
+            total_value_length += value_lengths[ndx];
+          }
+          ets_printf("VAL LENGTHS total_value_length[%d]\n", total_value_length);
+        } else { 
+          state = ST_VALUE_LENGTHS;
+        }
+        break;
+      case ST_VALUES:
+        if (value_loc < total_value_length - 1) {
+          ets_printf("VALUES\n");
+          ets_printf("%02x ", b);
+          values[value_loc] = b;
+          value_loc++;
+        } else {
+          // Catch the last value.
+          values[value_loc] = b;
+          ets_printf("%02x \n", b);
+          state = ST_CRC;
+        }
+        break;
+      case ST_CRC:
+        uint8_t crc = b;
+        ets_printf("CRC: %02x\n", crc);
+        ets_printf("VALUES READ:\n\t");
+        for (int ndx = 0 ; ndx < total_value_length; ndx++) {
+          ets_printf("%02x ", values[ndx]);
+        }
+        ets_printf("\n");
+        state = ST_START;
+        break; 
     }
+
+
+    // if (b > -1) {
+    //   ets_printf("%02x ", b);
+    //   has_message = true;
+    // }
     vTaskDelay(1);
   } 
 
@@ -174,7 +290,7 @@ void i2c_handler (void* parameter) {
 
 void loop() {
   if (has_message) {
-    ets_printf("has_message\n");
+    //ets_printf("has_message\n");
     has_message = false;
     //interpret_message();
   }
