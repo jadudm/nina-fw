@@ -42,10 +42,13 @@ extern "C" {
 // #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 #define SPI_BUFFER_LEN 32
 
-int debug = 1;
+int debug = 0;
 
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
+
+// FIXME: Think about how much space for values array.
+// uint8_t values[255];
 
 void dumpBuffer(const char* label, uint8_t data[], int length) {
   ets_printf("%s: ", label);
@@ -60,7 +63,8 @@ void dumpBuffer(const char* label, uint8_t data[], int length) {
 void setDebug(int d) {
   debug = d;
 
-  if (debug) {
+  // FIXME Was if(debug)
+  if (1) {
     PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[1], 0);
     PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[3], 0);
 
@@ -105,8 +109,8 @@ void setup() {
   setDebug(debug);
 
   // put SWD and SWCLK pins connected to SAMD as inputs
-  pinMode(15, INPUT);
-  pinMode(21, INPUT);
+  // pinMode(15, INPUT);
+  // pinMode(21, INPUT);
   
   if (debug) ets_printf("Initializing buffers\n");
   commandBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
@@ -144,14 +148,12 @@ void setup() {
 // I don't know if I want a compiler directive, but this is 
 // one way to keep the main loop clean.
 int transfer (uint8_t out[], uint8_t in[], size_t len) {
-  
   int commandLength = 0;
   #ifdef USE_I2C
   commandLength = I2CS.transfer(out, in, len);
   #else
   commandLength = SPIS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
   #endif
-
   return commandLength;
 }
 
@@ -163,6 +165,7 @@ int transfer (uint8_t out[], uint8_t in[], size_t len) {
 #define ST_VALUE_LENGTHS 0x04
 #define ST_VALUES 0x05
 #define ST_CRC 0x06
+#define ST_PROCESS 0x07
 #define HEADER_B1 0xAD
 #define HEADER_B2 0xAF
 int state = ST_START;
@@ -176,8 +179,11 @@ void i2c_handler (void* parameter) {
   uint8_t value_counter = 0;
   uint8_t total_value_length = 0;
   uint8_t value_loc = 0;
-  // FIXME: Think about how much space for values array.
-  uint8_t values[255];
+  uint8_t write_location = 0;
+
+  // FIXME FIXME: Until I rename, point to the same thing.
+  uint8_t* values;
+  values = commandBuffer;
 
   while (true) {
     // Returns -1 if error; otherwise, byte value.
@@ -194,15 +200,16 @@ void i2c_handler (void* parameter) {
             break;
           case HEADER_B1:
 
-            ets_printf("HEADER B1\n");
+            if (debug) ets_printf("HEADER B1\n");
             // Initialize the variables that carry state.
             number_of_values = 0;
             memset(&value_lengths, 0x00, NUM_POSSIBLE_PARAMS);
             // FIXME: Think about how much space for values array.
-            memset(&values, 0x00, 255);
+            //memset(&values, 0x00, 255);
             value_counter = 0;
             total_value_length = 0;
             value_loc = 0;
+            write_location = 0;
 
             // Set the next state.
             state = ST_HEADER;
@@ -212,7 +219,7 @@ void i2c_handler (void* parameter) {
       // STATE: HEADER
       // Now we are looking for the second header byte.
       case ST_HEADER:
-        ets_printf("HEADER\n");
+        if (debug) ets_printf("HEADER\n");
         switch (b) {
           case HEADER_B2:
             state = ST_LENGTH;
@@ -227,7 +234,12 @@ void i2c_handler (void* parameter) {
       // 255 values can be packed together. 
       case ST_LENGTH:
         number_of_values = b;
-        ets_printf("LENGTH: %d\n", b);
+        // The number of values is stored in the zeroth
+        // possition, for handing off to the CommandHandler.
+        values[write_location] = b;
+        write_location += 1;
+
+        if (debug) ets_printf("LENGTH: %d\n", b);
         
         if (number_of_values < NUM_POSSIBLE_PARAMS) {
           state = ST_VALUE_LENGTHS;
@@ -236,10 +248,14 @@ void i2c_handler (void* parameter) {
         }
         break;
       case ST_VALUE_LENGTHS:
-        ets_printf("VAL LENGTHS\n");
+        if (debug) ets_printf("VAL LENGTHS\n");
         value_lengths[value_counter] = b;
+        // [0] Number of values
+        // [1 ... ] The value lengths.
+        values[write_location] = b;
+        write_location += 1;
         value_counter++;
-        ets_printf("value_counter[%d] >= number_of_values[%d]\n", value_counter, number_of_values);
+        if (debug) ets_printf("value_counter[%d] >= number_of_values[%d]\n", value_counter, number_of_values);
         if (value_counter >= number_of_values) {
           state = ST_VALUES;
           // Calculate how long all the values are.
@@ -247,52 +263,64 @@ void i2c_handler (void* parameter) {
           for (int ndx = 0; ndx < number_of_values ; ndx++) {
             total_value_length += value_lengths[ndx];
           }
-          ets_printf("VAL LENGTHS total_value_length[%d]\n", total_value_length);
+          // ets_printf("VAL LENGTHS total_value_length[%d]\n", total_value_length);
         } else { 
           state = ST_VALUE_LENGTHS;
         }
         break;
       case ST_VALUES:
         if (value_loc < total_value_length - 1) {
-          ets_printf("VALUES\n");
-          ets_printf("%02x ", b);
-          values[value_loc] = b;
+          // [0] Number of values
+          // [1 ...] Value lengths
+          values[write_location] = b;
+          write_location += 1;
           value_loc++;
         } else {
           // Catch the last value.
-          values[value_loc] = b;
-          ets_printf("%02x \n", b);
+          values[write_location] = b;
+          write_location += 1;
           state = ST_CRC;
         }
         break;
       case ST_CRC:
         uint8_t crc = b;
-        ets_printf("CRC: %02x\n", crc);
-        ets_printf("VALUES READ:\n\t");
-        for (int ndx = 0 ; ndx < total_value_length; ndx++) {
-          ets_printf("%02x ", values[ndx]);
+        if (debug) ets_printf("CRC: %02x\n", crc);
+        values[write_location] = crc;
+        write_location += 1;
+
+        if (debug) {
+          ets_printf("VALUES READ:\n\t");
+          for (int ndx = 0 ; ndx < write_location; ndx++) {
+            ets_printf("%02x ", values[ndx]);
+          }
+          ets_printf("\n");
         }
-        ets_printf("\n");
-        state = ST_START;
+        // This gets picked up outside the event handler.
+        // It keeps us from overwriting the values[] array.
+        state = ST_PROCESS;
         break; 
     }
 
-
-    // if (b > -1) {
-    //   ets_printf("%02x ", b);
-    //   has_message = true;
-    // }
     vTaskDelay(1);
   } 
 
   vTaskDelete(NULL);
 }
+// [       2 bytes] 0xAD 0xAF
+// [        1 byte] Number of values (N)
+// [       N bytes] The length of each value (M)
+// [ E Ni*Mi bytes] Each value N of length M
+// [        1 byte] CRC
+
+void interpret_message() {
+  ets_printf(".");
+  CommandHandler.handle(commandBuffer, responseBuffer);
+}
 
 void loop() {
-  if (has_message) {
-    //ets_printf("has_message\n");
-    has_message = false;
-    //interpret_message();
+  if (state == ST_PROCESS) {
+    interpret_message();
+    state = ST_START;
   }
   vTaskDelay(1);
 }

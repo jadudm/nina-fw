@@ -937,9 +937,8 @@ int getSocket(const uint8_t command[], uint8_t response[])
 
 int setPinMode(const uint8_t command[], uint8_t response[])
 {
-  uint8_t pin = command[4];
+  uint8_t pin = command[5];
   uint8_t mode = command[6];
- 
   /// ets_printf("pinMode(%02x, %02x)\n", pin, mode);
  
   pinMode(pin, mode);
@@ -953,10 +952,9 @@ int setPinMode(const uint8_t command[], uint8_t response[])
 
 int setDigitalWrite(const uint8_t command[], uint8_t response[])
 {
-  uint8_t pin = command[4];
+  uint8_t pin = command[5];
   uint8_t value = command[6];
-  
-  //ets_printf("digitalWrite(%02x, %02x)\n", pin, value);
+  // ets_printf("digitalWrite(%02x, %02x)\n", pin, value);
 
   digitalWrite(pin, value);
 
@@ -1093,28 +1091,78 @@ void CommandHandlerClass::begin()
   xTaskCreatePinnedToCore(CommandHandlerClass::gpio0Updater, "gpio0Updater", 8192, NULL, 1, NULL, 1);
 }
 
+// int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
+// {
+//   int responseLength = 0;
+
+//   if (command[0] == 0xe0 && command[1] < NUM_COMMAND_HANDLERS) {
+//     //ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
+
+//     CommandHandlerType commandHandlerType = commandHandlers[command[1]];
+
+//     if (commandHandlerType) {
+//       responseLength = commandHandlerType(command, response);
+//     }
+//   }
+
+//   if (responseLength == 0) {
+//     response[0] = 0xef;
+//     response[1] = 0x00;
+//     response[2] = 0xee;
+
+//     responseLength = 3;
+//   } else {
+//     response[0] = 0xe0;
+//     response[1] = (0x80 | command[1]);
+//     response[responseLength - 1] = 0xee;
+//   }
+
+//   xSemaphoreGive(_updateGpio0PinSemaphore);
+
+//   return responseLength;
+// }
+
 int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
 {
   int responseLength = 0;
+  // ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
 
-  if (command[0] == 0xe0 && command[1] < NUM_COMMAND_HANDLERS) {
-    //ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
+  // To get here, the command has already been validated by the 
+  // state machine. The header is gone.
+  // The function is always the first parameter, which will be
+  // at location [0] plus one.
+  uint8_t whichFun = command[command[0] + 1];
+  // ets_printf("Calling function [ %d ]\n", whichFun);
 
-    CommandHandlerType commandHandlerType = commandHandlers[command[1]];
+  CommandHandlerType commandHandlerType = commandHandlers[whichFun];
 
-    if (commandHandlerType) {
-      responseLength = commandHandlerType(command, response);
-    }
+  if (commandHandlerType) {
+    responseLength = commandHandlerType(command, response);
   }
 
+  // FIXME: 
+  // Now, the response needs to be generated.
+  // That means the first two bytes are 0xADAF
+  // Then, the number of values coming back. This should be 1.
+  // Then, the length of that value. This is a single byte.
+  // Then, the value itself.
+  // Then, a CRC. 
+  // If I was returning a single true/false, I would return:
+  // [0xAD, 0xAF, 1, 1, bool, CRC]
+  // where 'bool' would be 1 or 0.
+  // The CRC will be the sum of everything in the array (except the CRC)
+  // and that summation will be % 256
+  // FIXME:
+  // Nothing that follows is particularly correct.
+  // That is, I poked at setting the response bytes, but
+  // really, this is one place where work needs to start.
   if (responseLength == 0) {
-    response[0] = 0xef;
-    response[1] = 0x00;
-    response[2] = 0xee;
-
-    responseLength = 3;
+    response[0] = 0xAD;
+    response[1] = 0xAF;
+    responseLength = 0;
   } else {
-    response[0] = 0xe0;
+    response[0] = 0xAD;
+    response[1] = 0xAF;
     response[1] = (0x80 | command[1]);
     response[responseLength - 1] = 0xee;
   }
