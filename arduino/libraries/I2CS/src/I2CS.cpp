@@ -105,6 +105,50 @@ int I2CSClass::read_byte() {
   }
 }
 
+
+// State machine for reading a request packet from the 
+// Adafruit SPI/I2C library.
+int I2CSClass::read_packet(uint8_t buffer[]) {
+  int ptr = 0;
+  memset(buffer, 0x00, 16);
+
+  // Read in the start command, 0x0E
+  i2c_slave_read_buffer(_i2cPortNum, &buffer[ptr], 1, portMAX_DELAY);
+  ptr += 1;
+
+  // Read in the command itself 
+  i2c_slave_read_buffer(_i2cPortNum, &buffer[ptr], 1, portMAX_DELAY);
+  ptr += 1;
+
+  // Read in the number of parameters
+  i2c_slave_read_buffer(_i2cPortNum, &buffer[ptr], 1, portMAX_DELAY);
+  ptr += 1;
+  
+  // Now, read in those parameters.
+  for (int ndx = 0 ; ndx < buffer[2] ; ndx++) {
+    // Read in the length of this parameters
+    uint8_t param_length;
+    i2c_slave_read_buffer(_i2cPortNum, &param_length, 1, portMAX_DELAY);
+    buffer[ptr] = param_length;
+    ptr += 1;
+
+    for (int param_ndx = 0 ; param_ndx < param_length ; param_ndx++) {
+      i2c_slave_read_buffer(_i2cPortNum, &buffer[ptr], 1, portMAX_DELAY);
+      ptr += 1;
+    }    
+  }
+
+  // Read the end byte.
+  i2c_slave_read_buffer(_i2cPortNum, &buffer[ptr], 1, portMAX_DELAY);
+  
+  // Return 0 if everything is good.
+  if ((buffer[0] == 0xE0) && (buffer[ptr] == 0xEE)) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
 int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 {
   int result = -1;
@@ -124,19 +168,16 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
     // https://esp32.com/viewtopic.php?f=2&t=2377
     result = i2c_slave_write_buffer(_i2cPortNum, out, len, 50);
   } else if (out == NULL) {
-    // if (_debug) ets_printf("INPUT I2C BUFFER len[%d]\n", len);
-    // Read the length
+    // Delay timing
     // 1 is 10ms
     // 10 is 100ms
     // 100 is 1000ms
-    result = i2c_slave_read_buffer(_i2cPortNum, &byte, 1, portMAX_DELAY);
-    // ets_printf("\n%d\n", byte);
-    // Read the bytes
-    result = i2c_slave_read_buffer(_i2cPortNum, in, byte, portMAX_DELAY);
+    int result = read_packet(in);
     
-    if (_debug) {
+    if (_debug && !result) {
       ets_printf("I2C IN RESULT: %d\n\t", result);
-      for (int ndx = 0; ndx < len ; ndx++) {
+      
+      for (int ndx = 0; ndx < 8 ; ndx++) {
         ets_printf("%02x ", in[ndx]);
       }
       ets_printf("\n\n");

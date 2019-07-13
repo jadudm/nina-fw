@@ -42,7 +42,7 @@ extern "C" {
 // #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 #define SPI_BUFFER_LEN 32
 
-int debug = 0;
+int debug = 1;
 
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
@@ -130,18 +130,18 @@ void setup() {
   CommandHandler.begin();
 
   if (debug) ets_printf("i2c_handler task creation...\n");
-  xTaskCreate(i2c_handler, 
-              // task handler
-              "i2c_handler",
-              // stack size
-              10000,
-              // task parameter
-              NULL,
-              // priority
-              1,
-              // handle for tracking the created task
-              NULL
-              );
+  // xTaskCreate(i2c_handler, 
+  //             // task handler
+  //             "i2c_handler",
+  //             // stack size
+  //             10000,
+  //             // task parameter
+  //             NULL,
+  //             // priority
+  //             1,
+  //             // handle for tracking the created task
+  //             NULL
+  //             );
 }
 
 // MCJ 20190627
@@ -157,170 +157,9 @@ int transfer (uint8_t out[], uint8_t in[], size_t len) {
   return commandLength;
 }
 
-
-#define ERROR_BYTE -1
-#define ST_START 0x01
-#define ST_HEADER 0x02
-#define ST_LENGTH 0x03
-#define ST_VALUE_LENGTHS 0x04
-#define ST_VALUES 0x05
-#define ST_CRC 0x06
-#define ST_PROCESS 0x07
-#define HEADER_B1 0xAD
-#define HEADER_B2 0xAF
-int state = ST_START;
-#define NUM_POSSIBLE_PARAMS 255
-
-// http://www.esp32learning.com/code/esp32-and-freertos-example-create-a-task.php
-// https://www.hackster.io/Niket/tasks-parametertotasks-freertos-tutorial-5-b8a7b7
-void i2c_handler (void* parameter) {
-  uint8_t number_of_values = 0;
-  uint8_t value_lengths[NUM_POSSIBLE_PARAMS];
-  uint8_t value_counter = 0;
-  uint8_t total_value_length = 0;
-  uint8_t value_loc = 0;
-  uint8_t write_location = 0;
-
-  // FIXME FIXME: Until I rename, point to the same thing.
-  uint8_t* values;
-  values = commandBuffer;
-
-  while (true) {
-    // Returns -1 if error; otherwise, byte value.
-
-    int b = I2CS.read_byte();
-
-    switch (state) {
-      // STATE: START
-      // We are looking for the first header byte.
-      case ST_START:
-        switch (b) {
-          case ERROR_BYTE:
-            // pass
-            break;
-          case HEADER_B1:
-
-            if (debug) ets_printf("HEADER B1\n");
-            // Initialize the variables that carry state.
-            number_of_values = 0;
-            memset(&value_lengths, 0x00, NUM_POSSIBLE_PARAMS);
-            // FIXME: Think about how much space for values array.
-            //memset(&values, 0x00, 255);
-            value_counter = 0;
-            total_value_length = 0;
-            value_loc = 0;
-            write_location = 0;
-
-            // Set the next state.
-            state = ST_HEADER;
-            break;
-        }
-        break;
-      // STATE: HEADER
-      // Now we are looking for the second header byte.
-      case ST_HEADER:
-        if (debug) ets_printf("HEADER\n");
-        switch (b) {
-          case HEADER_B2:
-            state = ST_LENGTH;
-            break;
-          default:
-            state = ST_START;
-            break;
-        }
-        break;
-      // In this state, we are going to read a single byte
-      // that says how many values are being sent. A max of
-      // 255 values can be packed together. 
-      case ST_LENGTH:
-        number_of_values = b;
-        // The number of values is stored in the zeroth
-        // possition, for handing off to the CommandHandler.
-        values[write_location] = b;
-        write_location += 1;
-
-        if (debug) ets_printf("LENGTH: %d\n", b);
-        
-        if (number_of_values < NUM_POSSIBLE_PARAMS) {
-          state = ST_VALUE_LENGTHS;
-        } else {
-          state = ST_START;
-        }
-        break;
-      case ST_VALUE_LENGTHS:
-        if (debug) ets_printf("VAL LENGTHS\n");
-        value_lengths[value_counter] = b;
-        // [0] Number of values
-        // [1 ... ] The value lengths.
-        values[write_location] = b;
-        write_location += 1;
-        value_counter++;
-        if (debug) ets_printf("value_counter[%d] >= number_of_values[%d]\n", value_counter, number_of_values);
-        if (value_counter >= number_of_values) {
-          state = ST_VALUES;
-          // Calculate how long all the values are.
-          total_value_length = 0;
-          for (int ndx = 0; ndx < number_of_values ; ndx++) {
-            total_value_length += value_lengths[ndx];
-          }
-          // ets_printf("VAL LENGTHS total_value_length[%d]\n", total_value_length);
-        } else { 
-          state = ST_VALUE_LENGTHS;
-        }
-        break;
-      case ST_VALUES:
-        if (value_loc < total_value_length - 1) {
-          // [0] Number of values
-          // [1 ...] Value lengths
-          values[write_location] = b;
-          write_location += 1;
-          value_loc++;
-        } else {
-          // Catch the last value.
-          values[write_location] = b;
-          write_location += 1;
-          state = ST_CRC;
-        }
-        break;
-      case ST_CRC:
-        uint8_t crc = b;
-        if (debug) ets_printf("CRC: %02x\n", crc);
-        values[write_location] = crc;
-        write_location += 1;
-
-        if (debug) {
-          ets_printf("VALUES READ:\n\t");
-          for (int ndx = 0 ; ndx < write_location; ndx++) {
-            ets_printf("%02x ", values[ndx]);
-          }
-          ets_printf("\n");
-        }
-        // This gets picked up outside the event handler.
-        // It keeps us from overwriting the values[] array.
-        state = ST_PROCESS;
-        break; 
-    }
-
-    vTaskDelay(1);
-  } 
-
-  vTaskDelete(NULL);
-}
-// [       2 bytes] 0xAD 0xAF
-// [        1 byte] Number of values (N)
-// [       N bytes] The length of each value (M)
-// [ E Ni*Mi bytes] Each value N of length M
-// [        1 byte] CRC
-
-void interpret_message() {
+void loop() {
+  I2CS.transfer(NULL, commandBuffer, 0);
   ets_printf(".");
   CommandHandler.handle(commandBuffer, responseBuffer);
-}
-
-void loop() {
-  if (state == ST_PROCESS) {
-    interpret_message();
-    state = ST_START;
-  }
-  vTaskDelay(1);
+  vTaskDelay(1);  
 }

@@ -937,9 +937,9 @@ int getSocket(const uint8_t command[], uint8_t response[])
 
 int setPinMode(const uint8_t command[], uint8_t response[])
 {
-  uint8_t pin = command[5];
+  uint8_t pin = command[4];
   uint8_t mode = command[6];
-  /// ets_printf("pinMode(%02x, %02x)\n", pin, mode);
+  ets_printf("pinMode(%02x, %02x)\n", pin, mode);
  
   pinMode(pin, mode);
 
@@ -952,9 +952,9 @@ int setPinMode(const uint8_t command[], uint8_t response[])
 
 int setDigitalWrite(const uint8_t command[], uint8_t response[])
 {
-  uint8_t pin = command[5];
+  uint8_t pin = command[4];
   uint8_t value = command[6];
-  // ets_printf("digitalWrite(%02x, %02x)\n", pin, value);
+  ets_printf("digitalWrite(%02x, %02x)\n", pin, value);
 
   digitalWrite(pin, value);
 
@@ -1125,16 +1125,9 @@ void CommandHandlerClass::begin()
 int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
 {
   int responseLength = 0;
-  // ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
+  ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
 
-  // To get here, the command has already been validated by the 
-  // state machine. The header is gone.
-  // The function is always the first parameter, which will be
-  // at location [0] plus one.
-  uint8_t whichFun = command[command[0] + 1];
-  // ets_printf("Calling function [ %d ]\n", whichFun);
-
-  CommandHandlerType commandHandlerType = commandHandlers[whichFun];
+  CommandHandlerType commandHandlerType = commandHandlers[command[1]];
 
   if (commandHandlerType) {
     responseLength = commandHandlerType(command, response);

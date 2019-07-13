@@ -36,6 +36,7 @@ class I2CSClass {
     int begin();
     int read_byte();
     int transfer(uint8_t out[], uint8_t in[], size_t len);
+    int read_packet(uint8_t buffer[]);
 
   // MCJ 20190627
   // No private methods (yet)
