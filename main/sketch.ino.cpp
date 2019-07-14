@@ -157,9 +157,33 @@ int transfer (uint8_t out[], uint8_t in[], size_t len) {
   return commandLength;
 }
 
+// void loop() {
+//   I2CS.transfer(NULL, commandBuffer, 0);
+//   ets_printf(".");
+//   CommandHandler.handle(commandBuffer, responseBuffer);
+//   vTaskDelay(1);  
+// }
+
 void loop() {
-  I2CS.transfer(NULL, commandBuffer, 0);
-  ets_printf(".");
-  CommandHandler.handle(commandBuffer, responseBuffer);
-  vTaskDelay(1);  
+  // wait for a command
+  memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
+  int commandLength = transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
+
+  if (commandLength == 0) {
+    return;
+  }
+
+  if (debug) {
+    dumpBuffer("COMMAND", commandBuffer, commandLength);
+  }
+
+  // process
+  memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
+  int responseLength = CommandHandler.handle(commandBuffer, responseBuffer);
+
+  transfer(responseBuffer, NULL, responseLength);
+
+  if (debug) {
+    dumpBuffer("RESPONSE", responseBuffer, responseLength);
+  }
 }

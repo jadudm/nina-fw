@@ -26,11 +26,12 @@
 
 SemaphoreHandle_t print_mux = NULL;
 
-I2CSClass::I2CSClass(int i2cPortNum, int sclPin, int sdaPin, int i2cAddr) :
+I2CSClass::I2CSClass(int i2cPortNum, int sclPin, int sdaPin, int i2cAddr, int readyPin) :
   _i2cPortNum((i2c_port_t)i2cPortNum),
   _sclPin((gpio_num_t)sclPin),
   _sdaPin((gpio_num_t)sdaPin),
-  _i2cAddr(i2cAddr)
+  _i2cAddr(i2cAddr),
+  _readyPin(readyPin)
 {
   // Empty class. Nifty C++ thing.
 }
@@ -89,28 +90,26 @@ int I2CSClass::begin()
   return 1;
 }
 
-int I2CSClass::read_byte() {
-  uint8_t byte = 0;
+// int I2CSClass::read_byte() {
+//   uint8_t byte = 0;
 
-  int result = i2c_slave_read_buffer(_i2cPortNum, &byte, 1, 1);
+//   int result = i2c_slave_read_buffer(_i2cPortNum, &byte, 1, 1);
 
-  if (result == ESP_FAIL) {
-    return ESP_FAIL;
-  } else if (result == 0) {
-    // FIXME: This is the same as ESP_FAIL...
-    return -1;
-  } else {
-    i2c_reset_rx_fifo(_i2cPortNum);
-    return byte;
-  }
-}
-
+//   if (result == ESP_FAIL) {
+//     return ESP_FAIL;
+//   } else if (result == 0) {
+//     // FIXME: This is the same as ESP_FAIL...
+//     return -1;
+//   } else {
+//     i2c_reset_rx_fifo(_i2cPortNum);
+//     return byte;
+//   }
+// }
 
 // State machine for reading a request packet from the 
 // Adafruit SPI/I2C library.
 int I2CSClass::read_packet(uint8_t buffer[]) {
   int ptr = 0;
-  memset(buffer, 0x00, 16);
 
   // Read in the start command, 0x0E
   i2c_slave_read_buffer(_i2cPortNum, &buffer[ptr], 1, portMAX_DELAY);
@@ -151,11 +150,8 @@ int I2CSClass::read_packet(uint8_t buffer[]) {
 
 int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 {
-  int result = -1;
-  uint8_t byte = 0;
 
-  i2c_reset_rx_fifo(_i2cPortNum);
-  i2c_reset_tx_fifo(_i2cPortNum);
+  // i2c_reset_rx_fifo(_i2cPortNum);
 
   // If 'in' is NULL, then we're doing an output.
   if (in == NULL) {
@@ -166,17 +162,19 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
     // How long until we time out?
     // How about one tick, which is... 10ms?
     // https://esp32.com/viewtopic.php?f=2&t=2377
-    result = i2c_slave_write_buffer(_i2cPortNum, out, len, 50);
-  } else if (out == NULL) {
     // Delay timing
     // 1 is 10ms
     // 10 is 100ms
     // 100 is 1000ms
-    int result = read_packet(in);
+    // int result =   
+    i2c_reset_tx_fifo(_i2cPortNum);
+    i2c_slave_write_buffer(_i2cPortNum, out, len, 100);
+
+  } else if (out == NULL) {
     
-    if (_debug && !result) {
-      ets_printf("I2C IN RESULT: %d\n\t", result);
-      
+    int err = read_packet(in);
+    
+    if (_debug && !err) {
       for (int ndx = 0; ndx < 8 ; ndx++) {
         ets_printf("%02x ", in[ndx]);
       }
@@ -196,5 +194,6 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 // I2CSClass(int i2cNum, int sclPin, int sdaPin, int i2cAddr);
 // SCL on the Huzzah32 is GPIO22
 // SDA on the Huzzah32 is GPIO23
-I2CSClass I2CS(I2C_NUM_0, GPIO_NUM_22, GPIO_NUM_23, 0x2A);
+// Pin 14/A6 on the Huzzah32 is module pin 17.
+I2CSClass I2CS(I2C_NUM_0, GPIO_NUM_22, GPIO_NUM_23, 0x2A, GPIO_NUM_14);
 

@@ -1091,71 +1091,33 @@ void CommandHandlerClass::begin()
   xTaskCreatePinnedToCore(CommandHandlerClass::gpio0Updater, "gpio0Updater", 8192, NULL, 1, NULL, 1);
 }
 
-// int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
-// {
-//   int responseLength = 0;
-
-//   if (command[0] == 0xe0 && command[1] < NUM_COMMAND_HANDLERS) {
-//     //ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
-
-//     CommandHandlerType commandHandlerType = commandHandlers[command[1]];
-
-//     if (commandHandlerType) {
-//       responseLength = commandHandlerType(command, response);
-//     }
-//   }
-
-//   if (responseLength == 0) {
-//     response[0] = 0xef;
-//     response[1] = 0x00;
-//     response[2] = 0xee;
-
-//     responseLength = 3;
-//   } else {
-//     response[0] = 0xe0;
-//     response[1] = (0x80 | command[1]);
-//     response[responseLength - 1] = 0xee;
-//   }
-
-//   xSemaphoreGive(_updateGpio0PinSemaphore);
-
-//   return responseLength;
-// }
-
 int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
 {
   int responseLength = 0;
-  ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
 
-  CommandHandlerType commandHandlerType = commandHandlers[command[1]];
+  if (command[0] == 0xe0 && command[1] < NUM_COMMAND_HANDLERS) {
+    //ets_printf("command[0]:[%d] command[1]:[%d]\n", command[0], command[1]);
 
-  if (commandHandlerType) {
-    responseLength = commandHandlerType(command, response);
+    CommandHandlerType commandHandlerType = commandHandlers[command[1]];
+
+    if (commandHandlerType) {
+      responseLength = commandHandlerType(command, response);
+    }
   }
 
-  // FIXME: 
-  // Now, the response needs to be generated.
-  // That means the first two bytes are 0xADAF
-  // Then, the number of values coming back. This should be 1.
-  // Then, the length of that value. This is a single byte.
-  // Then, the value itself.
-  // Then, a CRC. 
-  // If I was returning a single true/false, I would return:
-  // [0xAD, 0xAF, 1, 1, bool, CRC]
-  // where 'bool' would be 1 or 0.
-  // The CRC will be the sum of everything in the array (except the CRC)
-  // and that summation will be % 256
-  // FIXME:
-  // Nothing that follows is particularly correct.
-  // That is, I poked at setting the response bytes, but
-  // really, this is one place where work needs to start.
   if (responseLength == 0) {
-    response[0] = 0xAD;
-    response[1] = 0xAF;
-    responseLength = 0;
+    response[0] = 0xef;
+    response[1] = 0x00;
+    response[2] = 0xee;
+
+    responseLength = 3;
   } else {
-    response[0] = 0xAD;
-    response[1] = 0xAF;
+    // 0x50 0101 0000
+    // 0x80 1000 0000
+    //   OR 1101 0000
+    // 0xD0
+    // e0 d0 01 01 01 ee
+    response[0] = 0xe0;
     response[1] = (0x80 | command[1]);
     response[responseLength - 1] = 0xee;
   }

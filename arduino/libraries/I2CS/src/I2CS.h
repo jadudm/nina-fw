@@ -31,7 +31,7 @@ class I2CSClass {
     // sdaPin  -> 18
     // i2cAddr -> In the range 0x01 to 0x7F
     // Regarding GPIO pin numbers: http://bit.ly/31W5e57
-    I2CSClass(int i2cPortNum, int sclPin, int sdaPin, int i2cAddr);
+    I2CSClass(int i2cPortNum, int sclPin, int sdaPin, int i2cAddr, int readyPin);
 
     int begin();
     int read_byte();
@@ -47,6 +47,7 @@ class I2CSClass {
     gpio_num_t _sclPin;
     gpio_num_t _sdaPin;
     int _i2cAddr;
+    int _readyPin;
     int _debug = 1;
 
     // WARNING MCJ 20190627
