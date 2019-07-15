@@ -172,6 +172,7 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
     i2c_slave_write_buffer(_i2cPortNum, out, len, 100);
     
   } else if (out == NULL) {
+    
     set_ready_state(true);
     int err = read_packet(in);
     // i2c_reset_rx_fifo(_i2cPortNum);

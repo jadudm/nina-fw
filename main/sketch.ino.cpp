@@ -154,11 +154,9 @@ void loop() {
   memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
 
   if (debug) ets_printf("READY FOR USER COMMAND\n");
-  //I2CS.set_ready_state(true);
 
   int commandLength = transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
 
-  //I2CS.set_ready_state(false);
   if (debug) ets_printf("PROCESSING USER COMMAND\n");
 
   // I2CS.set_ready_state(false);
@@ -177,7 +175,6 @@ void loop() {
   // process
   memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
   int responseLength = CommandHandler.handle(commandBuffer, responseBuffer);
-  //I2CS.set_ready_state(true);
   if (debug) ets_printf("READY TO PROVIDE A RESPONSE\n");
 
   transfer(responseBuffer, NULL, responseLength);

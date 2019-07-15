@@ -228,6 +228,9 @@ extern "C" {
 
 int getTemperature(const uint8_t command[], uint8_t response[])
 {
+  uint8_t dummy_array[6] = {0, 1, 2, 3, 4, 5};
+  memset(&dummy_array, 0xBE, sizeof(dummy_array));
+
   float temperature = (temprature_sens_read() - 32) / 1.8;
 
   response[2] = 1; // number of parameters
