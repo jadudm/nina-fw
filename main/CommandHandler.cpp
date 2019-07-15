@@ -240,8 +240,10 @@ int getTemperature(const uint8_t command[], uint8_t response[])
 
 int getConnStatus(const uint8_t command[], uint8_t response[])
 {
-  uint8_t status = WiFi.status();
+  ets_printf("\tgetConnStatus\n");
 
+  uint8_t status = WiFi.status();
+  
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = status;
@@ -726,6 +728,8 @@ int getHostByName(const uint8_t command[], uint8_t response[])
 
 int startScanNetworks(const uint8_t command[], uint8_t response[])
 {
+  ets_printf("startScanNetworks\n");
+  
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = 1;
@@ -979,6 +983,16 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
   return 6;
 }
 
+int waitNSeconds(const uint8_t command[], uint8_t response[]) {
+  ets_printf("waiting %d seconds\n", command[4]);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
 int wpa2EntSetIdentity(const uint8_t command[], uint8_t response[]) {
   char identity[32 + 1];
 
@@ -1067,7 +1081,7 @@ const CommandHandlerType commandHandlers[] = {
   NULL, NULL, NULL, NULL, sendDataTcp, getDataBufTcp, insertDataBuf, NULL, NULL, NULL, wpa2EntSetIdentity, wpa2EntSetUsername, wpa2EntSetPassword, wpa2EntSetCACert, wpa2EntSetCertKey, wpa2EntEnable,
 
   // 0x50 -> 0x5f
-  setPinMode, setDigitalWrite, setAnalogWrite,
+  setPinMode, setDigitalWrite, setAnalogWrite, waitNSeconds,
 };
 
 #define NUM_COMMAND_HANDLERS (sizeof(commandHandlers) / sizeof(commandHandlers[0]))

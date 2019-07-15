@@ -107,6 +107,8 @@ void i2c_handler(void* parameter);
 
 void setup() {
   setDebug(debug);
+  // We aren't using Bluetooth, so release the 70K that this consumes.
+  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
 
   // put SWD and SWCLK pins connected to SAMD as inputs
   // pinMode(15, INPUT);
@@ -115,6 +117,8 @@ void setup() {
   if (debug) ets_printf("Initializing buffers\n");
   commandBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
   responseBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
+  ets_printf("SPI_BUFFER_LEN == %d\n", SPI_BUFFER_LEN);
+
   memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
   memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
 
@@ -129,19 +133,6 @@ void setup() {
   if (debug) ets_printf("Starting CommandHandler\n");
   CommandHandler.begin();
 
-  if (debug) ets_printf("i2c_handler task creation...\n");
-  // xTaskCreate(i2c_handler, 
-  //             // task handler
-  //             "i2c_handler",
-  //             // stack size
-  //             10000,
-  //             // task parameter
-  //             NULL,
-  //             // priority
-  //             1,
-  //             // handle for tracking the created task
-  //             NULL
-  //             );
 }
 
 // MCJ 20190627
@@ -157,18 +148,24 @@ int transfer (uint8_t out[], uint8_t in[], size_t len) {
   return commandLength;
 }
 
-// void loop() {
-//   I2CS.transfer(NULL, commandBuffer, 0);
-//   ets_printf(".");
-//   CommandHandler.handle(commandBuffer, responseBuffer);
-//   vTaskDelay(1);  
-// }
-
 void loop() {
   // wait for a command
+
   memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
+
+  if (debug) ets_printf("READY FOR USER COMMAND\n");
+  //I2CS.set_ready_state(true);
+
   int commandLength = transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
 
+  //I2CS.set_ready_state(false);
+  if (debug) ets_printf("PROCESSING USER COMMAND\n");
+
+  // I2CS.set_ready_state(false);
+  // 20190714 MCJ
+  // Apparently, there's a lot of garbage on the line.
+  // Or... something. Perhaps the ring buffer always returns *something*.
+  // Sometimes, we bail out of the loop here.
   if (commandLength == 0) {
     return;
   }
@@ -180,10 +177,14 @@ void loop() {
   // process
   memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
   int responseLength = CommandHandler.handle(commandBuffer, responseBuffer);
+  //I2CS.set_ready_state(true);
+  if (debug) ets_printf("READY TO PROVIDE A RESPONSE\n");
 
   transfer(responseBuffer, NULL, responseLength);
-
+  
+  
   if (debug) {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);
   }
+
 }

@@ -81,6 +81,13 @@ int I2CSClass::begin()
   } else if (check == ESP_FAIL && _debug) {
     ets_printf("I2C driver install fail.\n");
   }
+
+  // Set up the ready pin.
+  pinMode(_readyPin, OUTPUT);
+  set_ready_state(true);
+  // _readySemaphore = xSemaphoreCreateCounting(1, 0);
+
+
   // WARNING MCJ 20190627
   // The SPIS class returns 1. In the UNIX world, this is an error.
   // I'm assuming that 1 is being returned to be a notional TRUE
@@ -89,22 +96,6 @@ int I2CSClass::begin()
   // but it makes me uncomfortable.
   return 1;
 }
-
-// int I2CSClass::read_byte() {
-//   uint8_t byte = 0;
-
-//   int result = i2c_slave_read_buffer(_i2cPortNum, &byte, 1, 1);
-
-//   if (result == ESP_FAIL) {
-//     return ESP_FAIL;
-//   } else if (result == 0) {
-//     // FIXME: This is the same as ESP_FAIL...
-//     return -1;
-//   } else {
-//     i2c_reset_rx_fifo(_i2cPortNum);
-//     return byte;
-//   }
-// }
 
 // State machine for reading a request packet from the 
 // Adafruit SPI/I2C library.
@@ -148,11 +139,20 @@ int I2CSClass::read_packet(uint8_t buffer[]) {
   }
 }
 
+void I2CSClass::set_ready_state(bool is_ready) {
+  if (is_ready) {
+    ets_printf("_readyPin is ready LOW\n");
+    digitalWrite(_readyPin, LOW);  
+  } else {
+    ets_printf("_readyPin is not ready HIGH\n");
+    digitalWrite(_readyPin, HIGH);  
+  }
+  
+}
+
 int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
 {
-
-  // i2c_reset_rx_fifo(_i2cPortNum);
-
+  
   // If 'in' is NULL, then we're doing an output.
   if (in == NULL) {
     if (_debug) ets_printf("OUTPUT I2C BUFFER len[%d]\n", len);  
@@ -166,14 +166,17 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
     // 1 is 10ms
     // 10 is 100ms
     // 100 is 1000ms
-    // int result =   
-    i2c_reset_tx_fifo(_i2cPortNum);
+    // int result =   time.sleep(1)
+    // i2c_reset_tx_fifo(_i2cPortNum);
+    set_ready_state(true);
     i2c_slave_write_buffer(_i2cPortNum, out, len, 100);
-
+    
   } else if (out == NULL) {
-    
+    set_ready_state(true);
     int err = read_packet(in);
-    
+    // i2c_reset_rx_fifo(_i2cPortNum);
+    set_ready_state(false);
+
     if (_debug && !err) {
       for (int ndx = 0; ndx < 8 ; ndx++) {
         ets_printf("%02x ", in[ndx]);
