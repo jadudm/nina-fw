@@ -1055,8 +1055,15 @@ int wpa2EntSetCertKey(const uint8_t command[], uint8_t response[]) {
 
 int wpa2EntEnable(const uint8_t command[], uint8_t response[]) {
 
-  esp_wpa2_config_t config = WPA2_CONFIG_INIT_DEFAULT();
-  esp_wifi_sta_wpa2_ent_enable(&config);
+  // FIXME
+  // This changed from esp_wpa2_config_t
+  // Not sure if this is the correct struct.
+  // Also
+  // Was WPA2_CONFIG_INIT_DEFAULT
+  // became
+  // CONFIG_TCP_WND_DEFAULT
+  // wifi_config_t config = WPA2_CONFIG_INIT_DEFAULT();
+  //esp_wifi_sta_wpa2_ent_enable(&config);
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length

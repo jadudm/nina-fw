@@ -55,19 +55,19 @@ void WiFiServer::begin()
   addr.sin_port = htons(_port);
 
   if (lwip_bind(_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-    lwip_close_r(_socket);
+    lwip_close(_socket);
     _socket = -1;
     return;
   }
 
   if (lwip_listen(_socket, 1) < 0) {
-    lwip_close_r(_socket);
+    lwip_close(_socket);
     _socket = -1;
     return;
   }
 
   int nonBlocking = 1;
-  lwip_ioctl_r(_socket, FIONBIO, &nonBlocking);
+  lwip_ioctl(_socket, FIONBIO, &nonBlocking);
 
   return;
 }

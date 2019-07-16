@@ -63,14 +63,14 @@ int WiFiClient::connect(/*IPAddress*/uint32_t ip, uint16_t port)
   addr.sin_addr.s_addr = (uint32_t)ip;
   addr.sin_port = htons(port);
 
-  if (lwip_connect_r(_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-    lwip_close_r(_socket);
+  if (lwip_connect(_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    lwip_close(_socket);
     _socket = -1;
     return 0;
   }
 
   int nonBlocking = 1;
-  lwip_ioctl_r(_socket, FIONBIO, &nonBlocking);
+  lwip_ioctl(_socket, FIONBIO, &nonBlocking);
 
   return 1;
 }
@@ -86,10 +86,10 @@ size_t WiFiClient::write(const uint8_t *buf, size_t size)
     return 0;
   }
 
-  int result = lwip_send_r(_socket, (void*)buf, size, MSG_DONTWAIT);
+  int result = lwip_send(_socket, (void*)buf, size, MSG_DONTWAIT);
 
   if (result < 0) {
-    lwip_close_r(_socket);
+    lwip_close(_socket);
     _socket = -1;
     return 0;
   }
@@ -105,8 +105,8 @@ int WiFiClient::available()
 
   int result = 0;
 
-  if (lwip_ioctl_r(_socket, FIONREAD, &result) < 0) {
-    lwip_close_r(_socket);
+  if (lwip_ioctl(_socket, FIONREAD, &result) < 0) {
+    lwip_close(_socket);
     _socket = -1;
     return 0;
   }
@@ -131,10 +131,10 @@ int WiFiClient::read(uint8_t* buf, size_t size)
     return -1;
   }
 
-  int result = lwip_recv_r(_socket, buf, size, MSG_DONTWAIT);
+  int result = lwip_recv(_socket, buf, size, MSG_DONTWAIT);
 
   if (result <= 0 && errno != EWOULDBLOCK) {
-    lwip_close_r(_socket);
+    lwip_close(_socket);
     _socket = -1;
     return 0;
   }
@@ -152,7 +152,7 @@ int WiFiClient::peek()
 
   if (recv(_socket, &b, sizeof(b), MSG_PEEK | MSG_DONTWAIT) <= 0) {
     if (errno != EWOULDBLOCK) {
-      lwip_close_r(_socket);
+      lwip_close(_socket);
       _socket = -1;
     }
 
@@ -169,7 +169,7 @@ void WiFiClient::flush()
 void WiFiClient::stop()
 {
   if (_socket != -1) {
-    lwip_close_r(_socket);
+    lwip_close(_socket);
     _socket = -1;
   }
 }

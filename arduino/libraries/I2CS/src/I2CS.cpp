@@ -141,10 +141,10 @@ int I2CSClass::read_packet(uint8_t buffer[]) {
 
 void I2CSClass::set_ready_state(bool is_ready) {
   if (is_ready) {
-    ets_printf("_readyPin is ready LOW\n");
+    // ets_printf("_readyPin is ready LOW\n");
     digitalWrite(_readyPin, LOW);  
   } else {
-    ets_printf("_readyPin is not ready HIGH\n");
+    // ets_printf("_readyPin is not ready HIGH\n");
     digitalWrite(_readyPin, HIGH);  
   }
   
@@ -168,15 +168,22 @@ int I2CSClass::transfer(uint8_t out[], uint8_t in[], size_t len)
     // 100 is 1000ms
     // int result =   time.sleep(1)
     // i2c_reset_tx_fifo(_i2cPortNum);
-    set_ready_state(true);
+
+    i2c_reset_rx_fifo(_i2cPortNum);
+    i2c_reset_tx_fifo(_i2cPortNum);
+    vTaskDelay(10);
     i2c_slave_write_buffer(_i2cPortNum, out, len, 100);
+    set_ready_state(true);
+
+
     
   } else if (out == NULL) {
-    
+
+    // Just before writing this response, clear the buffers.
     set_ready_state(true);
     int err = read_packet(in);
-    // i2c_reset_rx_fifo(_i2cPortNum);
     set_ready_state(false);
+    //i2c_reset_tx_fifo(_i2cPortNum);
 
     if (_debug && !err) {
       for (int ndx = 0; ndx < 8 ; ndx++) {
